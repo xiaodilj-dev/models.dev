@@ -1,0 +1,45 @@
+name: Validate Qianliu catalog entry
+on:
+  push:
+    branches: [verify-qianliu-20261125]
+permissions:
+  contents: read
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the proposed catalog change
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: b87f7cff4f0ad062f7eb036f706a773fda672cc6
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun validate
+      - name: Review the v1 catalog delta
+        shell: bash
+        run: |
+          base=e8add433199029cb18bf4c7a9b5b9d8454200e34
+          test "$(git rev-parse HEAD^)" = "$base"
+          result=0
+          bun run v1:check "$base" > "$RUNNER_TEMP/qianliu-v1.log" 2>&1 || result=$?
+          cat "$RUNNER_TEMP/qianliu-v1.log"
+          test "$result" = 1
+          python3 - "$RUNNER_TEMP/qianliu-v1.log" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          report = Path(sys.argv[1]).read_text()
+          model = "qianliu/deepseek-v4-pro-0813"
+          assert re.search(r"^Added to v1 \(1;[^\n]*\): " + re.escape(model) + r"$", report, re.M), report
+          assert not re.search(r"^(Removed from v1|Changed v2 files with generic modalities)", report, re.M), report
+          assert re.search(r"^v1 output changed in \d+ of \d+ views\.$", report, re.M), report
+          changes = [line.strip() for line in report.splitlines() if re.match(r"^\s*\d+\s+.*\[.*\]$", line)]
+          assert changes and all("added" in line and line.endswith("[qianliu (provider)]") for line in changes), changes
+          PY
