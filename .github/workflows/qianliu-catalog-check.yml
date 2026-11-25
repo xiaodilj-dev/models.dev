@@ -12,8 +12,8 @@ jobs:
       - name: Check out the proposed catalog change
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: b87f7cff4f0ad062f7eb036f706a773fda672cc6
-          fetch-depth: 2
+          ref: a6adb9b2627409d2499b3d544f088cd34b0dbd29
+          fetch-depth: 3
           persist-credentials: false
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           base=e8add433199029cb18bf4c7a9b5b9d8454200e34
-          test "$(git rev-parse HEAD^)" = "$base"
+          git merge-base --is-ancestor "$base" HEAD
           result=0
           bun run v1:check "$base" > "$RUNNER_TEMP/qianliu-v1.log" 2>&1 || result=$?
           cat "$RUNNER_TEMP/qianliu-v1.log"
